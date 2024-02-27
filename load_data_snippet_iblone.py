@@ -1,6 +1,8 @@
 ##
 from one.api import ONE
 from brainbox.io.one import SpikeSortingLoader
+from neurodsp.voltage import destripe
+from viewephys.gui import viewephys
 
 one = ONE(base_url='https://openalyx.internationalbrainlab.org')
 
@@ -30,9 +32,16 @@ clusters = sl.merge_clusters(spikes, clusters, channels)
 sr_ap = sl.raw_electrophysiology(band="ap", stream=True)
 
 # Load raw data
-s_event = 100  # timepoint in recording to stream
-window_secs_ap = [0, 1]
-first, last = (int(window_secs_ap[0] * sr_ap.fs) + s_event, int(window_secs_ap[1] * sr_ap.fs + s_event))
+window_secs_ap = [0, 1]  # timepoint in recording to stream
+first, last = (int(window_secs_ap[0] * sr_ap.fs), int(window_secs_ap[1] * sr_ap.fs))
 raw_ap = sr_ap[first:last, :-sr_ap.nsync].T
 
+# Destripe
+destriped = destripe(raw_ap, fs=sr_ap.fs)
+
 ##
+# View data
+# %gui qt
+
+v_raw = viewephys(raw_ap, fs=sr_ap.fs)
+v_des = viewephys(destriped, fs=sr_ap.fs)
