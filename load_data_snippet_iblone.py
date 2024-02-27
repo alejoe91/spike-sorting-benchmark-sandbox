@@ -3,6 +3,7 @@ from one.api import ONE
 from brainbox.io.one import SpikeSortingLoader
 from neurodsp.voltage import destripe
 from viewephys.gui import viewephys
+import numpy as np
 
 one = ONE(base_url='https://openalyx.internationalbrainlab.org')
 
@@ -46,9 +47,19 @@ v_des = viewephys(destriped, fs=sr_ap.fs)
 
 ##
 # Get the spikes time (in samples), extract raw data and make an average
-clu_id = 0
-spike_idx = spikes['cluster'] == clu_id
+clu_id = 20
+spike_idx = spikes['clusters'] == clu_id
 spike_samples = spikes['samples'][spike_idx]
 
 # Use euclidian distance to get N nearest channels
+clu_ch = clusters['channels'][clu_id]
+eu_dist = 0
+for xyz in ['x', 'y', 'z']:
+    var = np.power(channels[xyz] - channels[xyz][clu_ch], 2)
+    eu_dist = eu_dist + var
+eu_dist = np.sqrt(eu_dist)
 
+# Threshold to get channels indices
+thres_dist = 0.1e-03
+ch_idx = np.where(eu_dist < thres_dist)[0]
+##
