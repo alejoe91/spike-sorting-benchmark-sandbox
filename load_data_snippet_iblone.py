@@ -1,13 +1,13 @@
 # %%
 from one.api import ONE
 from brainbox.io.one import SpikeSortingLoader
-from neurodsp.voltage import destripe
+from ibldsp.voltage import destripe
 from viewephys.gui import viewephys
 import numpy as np
 import pandas as pd
 import ibldsp.waveforms as waveforms
 from neuropixel import trace_header
-import ibldsp.utils as utils
+import ibldsp
 
 one = ONE(base_url='https://openalyx.internationalbrainlab.org')
 
@@ -37,14 +37,14 @@ spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.amps
 sr_ap = sl.raw_electrophysiology(band="ap", stream=True)
 
 # Load raw data
-window_secs_ap = [0, 1]  # timepoint in recording to stream
-first, last = (int(window_secs_ap[0] * sr_ap.fs), int(window_secs_ap[1] * sr_ap.fs))
-raw_ap = sr_ap[first:last, :-sr_ap.nsync].T
+window_secs_ap = np.array((0, 1))  # timepoint in recording to stream
+first_sample, last_sample = int(window_secs_ap[0] * sr_ap.fs), int(window_secs_ap[1] * sr_ap.fs)
+raw_ap = sr_ap[first_sample:last_sample, :-sr_ap.nsync].T
 
 # Destripe
 destriped = destripe(raw_ap, fs=sr_ap.fs)
 
-# %%
+##
 # View data
 # %gui qt
 
@@ -82,13 +82,20 @@ v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - window_secs_ap[0] * 1e3,
 ##
 # Get array of waveforms for all spikes
 
-arr = raw_ap
+# Truncate spikes to the window
+# we remove 100 ms to make sure there is enough raw data for the last spikes
+spik_in = (spikes['times'] > window_secs_ap[0]) & (spikes['times'] < window_secs_ap[1] - 0.100)
+for k in spikes.keys():
+    spikes[k] = spikes[k][spik_in]
 
-df = pd.DataFrame({"sample": spikes.samples, "peak_channel": clusters['channels'][spikes['clusters']]})
+arr = destriped.T
+spk_aligne = (spikes.samples - first_sample).astype('int')
+df = pd.DataFrame({"sample": (spikes.samples - first_sample).astype('int'),
+                   "peak_channel": clusters['channels'][spikes['clusters']]})
 # generate channel neighbor matrix for NP1, default radius 200um
 geom_dict = trace_header(version=1)
 geom = np.c_[geom_dict["x"], geom_dict["y"]]
-channel_neighbors = utils.make_channel_index(geom, radius=200.)
+channel_neighbors = ibldsp.utils.make_channel_index(geom, radius=200.)
 # radius = 200um, 38 chans
 num_channels = 38
 wfs = waveforms.extract_wfs_array(arr, df, channel_neighbors)
