@@ -23,6 +23,12 @@ benchmark_pids = ['1a276285-8b0e-4cc9-9f0a-a3a002978724',
 # Select a PID
 pid = benchmark_pids[0]
 
+##
+eid, pname = one.pid2eid(pid)
+path = 'one.eid2path(eid)'
+print(f'{path} - {pname}')
+##
+
 # Load spike sorting
 sl = SpikeSortingLoader(pid=pid, one=one)
 spikes, clusters, channels = sl.load_spike_sorting()
@@ -45,3 +51,6 @@ destriped = destripe(raw_ap, fs=sr_ap.fs)
 
 v_raw = viewephys(raw_ap, fs=sr_ap.fs)
 v_des = viewephys(destriped, fs=sr_ap.fs)
+
+##
+# Get the spikes time (in samples), extract raw data and make an average
