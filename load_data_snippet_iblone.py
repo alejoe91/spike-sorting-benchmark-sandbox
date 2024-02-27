@@ -4,6 +4,10 @@ from brainbox.io.one import SpikeSortingLoader
 from neurodsp.voltage import destripe
 from viewephys.gui import viewephys
 import numpy as np
+import pandas as pd
+import ibldsp.waveforms as waveforms
+from neuropixel import trace_header
+import ibldsp.utils as utils
 
 one = ONE(base_url='https://openalyx.internationalbrainlab.org')
 
@@ -27,6 +31,8 @@ pid = benchmark_pids[2]
 # Load spike sorting
 sl = SpikeSortingLoader(pid=pid, one=one)
 spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.amps', 'spikes.samples'])
+# sl.merge_clusters()
+
 # Get AP spikeglx.Reader objects
 sr_ap = sl.raw_electrophysiology(band="ap", stream=True)
 
@@ -46,6 +52,7 @@ destriped = destripe(raw_ap, fs=sr_ap.fs)
 v_des = viewephys(destriped, fs=sr_ap.fs)
 
 ##
+'''
 # Find a cluster that has spikes within the window
 spik_in = (spikes['times'] > window_secs_ap[0]) & (spikes['times'] < window_secs_ap[1])
 clu_in = np.unique(spikes['clusters'][spik_in])
@@ -71,7 +78,19 @@ ch_idx = np.where(eu_dist < thres_dist)[0]
 v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - window_secs_ap[0] * 1e3, np.repeat(clu_ch, len(spike_samples)),
                        label='detects_ibl', rgb=(255, 0, 0))
 
+'''
 ##
-time_bin = [0, 0.001]  # 1 millisecond
+# Get array of waveforms for all spikes
 
-# destriped[ch_idx, spike_samples]
+arr = raw_ap
+
+df = pd.DataFrame({"sample": spikes.samples, "peak_channel": clusters['channels'][spikes['clusters']]})
+# generate channel neighbor matrix for NP1, default radius 200um
+geom_dict = trace_header(version=1)
+geom = np.c_[geom_dict["x"], geom_dict["y"]]
+channel_neighbors = utils.make_channel_index(geom, radius=200.)
+# radius = 200um, 38 chans
+num_channels = 38
+wfs = waveforms.extract_wfs_array(arr, df, channel_neighbors)
+
+##
