@@ -1,4 +1,4 @@
-##
+# %%
 from one.api import ONE
 from brainbox.io.one import SpikeSortingLoader
 from neurodsp.voltage import destripe
@@ -19,21 +19,13 @@ benchmark_pids = ['1a276285-8b0e-4cc9-9f0a-a3a002978724',
                   'e8f9fba4-d151-4b00-bee7-447f0f3e752c',
                   'eebcaf65-7fa4-4118-869d-a084e84530e2',
                   'fe380793-8035-414e-b000-09bfe5ece92a']
-##
+# %%
 # Select a PID
 pid = benchmark_pids[0]
-
-##
-eid, pname = one.pid2eid(pid)
-path = 'one.eid2path(eid)'
-print(f'{path} - {pname}')
-##
 
 # Load spike sorting
 sl = SpikeSortingLoader(pid=pid, one=one)
 spikes, clusters, channels = sl.load_spike_sorting()
-clusters = sl.merge_clusters(spikes, clusters, channels)
-
 # Get AP spikeglx.Reader objects
 sr_ap = sl.raw_electrophysiology(band="ap", stream=True)
 
@@ -45,7 +37,7 @@ raw_ap = sr_ap[first:last, :-sr_ap.nsync].T
 # Destripe
 destriped = destripe(raw_ap, fs=sr_ap.fs)
 
-##
+# %%
 # View data
 # %gui qt
 
