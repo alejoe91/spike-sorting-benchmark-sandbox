@@ -1,4 +1,5 @@
 # %%
+import matplotlib.pyplot as plt
 from one.api import ONE
 from brainbox.io.one import SpikeSortingLoader
 from ibldsp.voltage import destripe
@@ -87,10 +88,11 @@ v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - window_secs_ap[0] * 1e3,
 spik_in = (spikes['times'] > window_secs_ap[0]) & (spikes['times'] < window_secs_ap[1] - 0.100)
 for k in spikes.keys():
     spikes[k] = spikes[k][spik_in]
+spikes['samples_aligned'] = (spikes.samples - first_sample).astype('int')
 
 arr = destriped.T
-spk_aligne = (spikes.samples - first_sample).astype('int')
-df = pd.DataFrame({"sample": (spikes.samples - first_sample).astype('int'),
+
+df = pd.DataFrame({"sample": spikes['samples_aligned'],
                    "peak_channel": clusters['channels'][spikes['clusters']]})
 # generate channel neighbor matrix for NP1, default radius 200um
 geom_dict = trace_header(version=1)
@@ -98,6 +100,38 @@ geom = np.c_[geom_dict["x"], geom_dict["y"]]
 channel_neighbors = ibldsp.utils.make_channel_index(geom, radius=200.)
 # radius = 200um, 38 chans
 num_channels = 38
-wfs = waveforms.extract_wfs_array(arr, df, channel_neighbors)
+wfs, cind, trough_offset = waveforms.extract_wfs_array(arr, df, channel_neighbors)
 
 ##
+# Do average for single cluster
+cluster_id = spikes['clusters'][0]
+spikes_idx = spikes['clusters'] == cluster_id
+wfs_avg = np.nanmean(wfs[spikes_idx, :, :], axis=0)
+
+# Plot single average
+plt.imshow(np.flipud(wfs_avg))
+
+# View
+clu_ch = clusters['channels'][cluster_id]
+spike_samples = spikes['samples'][spikes_idx]
+v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - first_sample * 1e3, np.repeat(clu_ch, len(spike_samples)),
+                       label='detects_ibl', rgb=(255, 0, 0))
+
+##
+# Remove template from raw data
+ch_cluster = cind[spikes_idx]
+spike_samples_start = spike_samples - trough_offset
+spikes_index_remove = np.array(range(0, wfs_avg.shape[1])) + np.array(spike_samples_start).reshape(-1, 1)
+
+arr_sub = arr.copy()
+for ispike in range(0, len(spike_samples_start)):
+    # Substract average wav from raw data and replace in array
+    indx = np.ix_(spikes_index_remove[ispike, :].astype('int'), ch_cluster[ispike, :].astype('int'))
+    arr_sub[indx] = arr[indx] - wfs_avg.T
+##
+viewers = {}
+viewers['raw'] = viewephys(arr.T, fs=sr_ap.fs, title='raw')
+viewers['remove'] = viewephys(arr_sub.T, fs=sr_ap.fs, title='remove')
+for label in viewers:
+    viewers[label].ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - first_sample * 1e3, np.repeat(clu_ch, len(spike_samples)),
+                           label='detects_ibl', rgb=(255, 0, 0))
