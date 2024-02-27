@@ -42,12 +42,16 @@ destriped = destripe(raw_ap, fs=sr_ap.fs)
 # View data
 # %gui qt
 
-v_raw = viewephys(raw_ap, fs=sr_ap.fs)
+# v_raw = viewephys(raw_ap, fs=sr_ap.fs)
 v_des = viewephys(destriped, fs=sr_ap.fs)
 
 ##
+# Find a cluster that has spikes within the window
+spik_in = (spikes['times'] > window_secs_ap[0]) & (spikes['times'] < window_secs_ap[1])
+clu_in = np.unique(spikes['clusters'][spik_in])
+
 # Get the spikes time (in samples), extract raw data and make an average
-clu_id = 20
+clu_id = clu_in[0]
 spike_idx = spikes['clusters'] == clu_id
 spike_samples = spikes['samples'][spike_idx]
 
@@ -62,4 +66,12 @@ eu_dist = np.sqrt(eu_dist)
 # Threshold to get channels indices
 thres_dist = 0.1e-03
 ch_idx = np.where(eu_dist < thres_dist)[0]
+
+# View
+v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - window_secs_ap[0] * 1e3, np.repeat(clu_ch, len(spike_samples)),
+                       label='detects_ibl', rgb=(255, 0, 0))
+
 ##
+time_bin = [0, 0.001]  # 1 millisecond
+
+# destriped[ch_idx, spike_samples]
