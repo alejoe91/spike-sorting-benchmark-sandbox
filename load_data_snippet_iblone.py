@@ -21,17 +21,16 @@ benchmark_pids = ['1a276285-8b0e-4cc9-9f0a-a3a002978724',
                   'fe380793-8035-414e-b000-09bfe5ece92a']
 ##
 # Select a PID
-pid = benchmark_pids[0]
+pid = benchmark_pids[2]
 
-##
 eid, pname = one.pid2eid(pid)
-path = 'one.eid2path(eid)'
-print(f'{path} - {pname}')
+path = one.eid2path(eid)
+print(f'{eid} - {pid} - {path} - {pname}')
 ##
 
 # Load spike sorting
 sl = SpikeSortingLoader(pid=pid, one=one)
-spikes, clusters, channels = sl.load_spike_sorting()
+spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.amps', 'spikes.samples'])
 clusters = sl.merge_clusters(spikes, clusters, channels)
 
 # Get AP spikeglx.Reader objects
@@ -54,3 +53,9 @@ v_des = viewephys(destriped, fs=sr_ap.fs)
 
 ##
 # Get the spikes time (in samples), extract raw data and make an average
+clu_id = 0
+spike_idx = spikes['cluster'] == clu_id
+spike_samples = spikes['samples'][spike_idx]
+
+# Use euclidian distance to get N nearest channels
+
