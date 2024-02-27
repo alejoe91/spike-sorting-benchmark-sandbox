@@ -54,11 +54,12 @@ spik_in = (spikes['times'] > window_secs_ap[0] + 0.1) & (spikes['times'] < windo
 for k in spikes.keys():
     spikes[k] = spikes[k][spik_in]
 spikes['samples_aligned'] = (spikes.samples - first_sample).astype('int')
+spikes['channels'] = clusters['channels'][spikes['clusters']]
 
 arr = destriped.T
 
 df = pd.DataFrame({"sample": spikes['samples_aligned'],
-                   "peak_channel": clusters['channels'][spikes['clusters']]})
+                   "peak_channel": spikes['channels']})
 # generate channel neighbor matrix for NP1, default radius 200um
 geom_dict = trace_header(version=1)
 geom = np.c_[geom_dict["x"], geom_dict["y"]]
@@ -103,5 +104,5 @@ viewers = {}
 viewers['raw'] = viewephys(arr.T, fs=sr_ap.fs, title='raw')
 viewers['remove'] = viewephys(arr_sub.T, fs=sr_ap.fs, title='remove')
 for label in viewers:
-    viewers[label].ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - first_sample * 1e3, np.repeat(clu_ch, len(spike_samples)),
+    viewers[label].ctrl.add_scatter(spikes['samples_aligned'] / sr_ap.fs * 1e3, spikes['channels'],
                            label='detects_ibl', rgb=(255, 0, 0))
