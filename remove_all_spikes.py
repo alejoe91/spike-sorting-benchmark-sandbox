@@ -46,54 +46,20 @@ raw_ap = sr_ap[first_sample:last_sample, :-sr_ap.nsync].T
 destriped = destripe(raw_ap, fs=sr_ap.fs)
 
 ##
-# View data
-# %gui qt
-
-# v_raw = viewephys(raw_ap, fs=sr_ap.fs)
-# v_des = viewephys(destriped, fs=sr_ap.fs)
-
-##
-'''
-# Find a cluster that has spikes within the window
-spik_in = (spikes['times'] > window_secs_ap[0]) & (spikes['times'] < window_secs_ap[1])
-clu_in = np.unique(spikes['clusters'][spik_in])
-
-# Get the spikes time (in samples), extract raw data and make an average
-clu_id = clu_in[0]
-spike_idx = spikes['clusters'] == clu_id
-spike_samples = spikes['samples'][spike_idx]
-
-# Use euclidian distance to get N nearest channels
-clu_ch = clusters['channels'][clu_id]
-eu_dist = 0
-for xyz in ['x', 'y', 'z']:
-    var = np.power(channels[xyz] - channels[xyz][clu_ch], 2)
-    eu_dist = eu_dist + var
-eu_dist = np.sqrt(eu_dist)
-
-# Threshold to get channels indices
-thres_dist = 0.1e-03
-ch_idx = np.where(eu_dist < thres_dist)[0]
-
-# View
-v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - window_secs_ap[0] * 1e3, np.repeat(clu_ch, len(spike_samples)),
-                       label='detects_ibl', rgb=(255, 0, 0))
-
-'''
-##
 # Get array of waveforms for all spikes
 
 # Truncate spikes to the window
-# we remove 100 ms to make sure there is enough raw data for the last spikes
+# we remove 100 ms to make sure there is enough raw data for the first/last spikes
 spik_in = (spikes['times'] > window_secs_ap[0] + 0.1) & (spikes['times'] < window_secs_ap[1] - 0.100)
 for k in spikes.keys():
     spikes[k] = spikes[k][spik_in]
 spikes['samples_aligned'] = (spikes.samples - first_sample).astype('int')
+spikes['channels'] = clusters['channels'][spikes['clusters']]
 
 arr = destriped.T
 
 df = pd.DataFrame({"sample": spikes['samples_aligned'],
-                   "peak_channel": clusters['channels'][spikes['clusters']]})
+                   "peak_channel": spikes['channels']})
 # generate channel neighbor matrix for NP1, default radius 200um
 geom_dict = trace_header(version=1)
 geom = np.c_[geom_dict["x"], geom_dict["y"]]
@@ -102,47 +68,41 @@ channel_neighbors = ibldsp.utils.make_channel_index(geom, radius=200.)
 num_channels = 38
 wfs, cind, trough_offset = waveforms.extract_wfs_array(arr, df, channel_neighbors, add_nan_trace=True)
 
+
 ##
+# remove for all
+arr_start = arr.copy()
+nch = len(channels['x'])
 # Do average for single cluster
-cluster_id = spikes['clusters'][0]
-spikes_idx = spikes['clusters'] == cluster_id
-wfs_avg = np.nanmean(wfs[spikes_idx, :, :], axis=0)
+for cluster_id in np.unique(spikes['clusters']):
 
-# Plot single average
-plt.imshow(np.flipud(wfs_avg))
+    spikes_idx = spikes['clusters'] == cluster_id
+    wfs_avg = np.nanmean(wfs[spikes_idx, :, :], axis=0)
 
-# View
+    # Remove template from raw data
+    spike_samples = spikes['samples'][spikes_idx]
+
+    ch_cluster = cind[spikes_idx]
+    spike_samples_start = spike_samples - trough_offset
+    spikes_index_remove = np.array(range(0, wfs_avg.shape[1])) + np.array(spike_samples_start).reshape(-1, 1)
+
+    arr_sub = arr_start.copy()
+    for ispike in range(0, len(spike_samples_start)):
+        # Substract average wav from raw data and replace in array
+        # Edge case to remove ch indices outside
+        idx_ch_notout = ch_cluster[ispike, :]
+        idx_ch_notout = idx_ch_notout[np.where(idx_ch_notout < nch)[0]]
+        indx = np.ix_(spikes_index_remove[ispike, :].astype('int'), idx_ch_notout.astype('int'))
+        arr_sub[indx] = arr_start[indx] - wfs_avg.T[:, np.where(idx_ch_notout < nch)[0]]
+        # TODO remove channels from avg that are outside
+    print(cluster_id)
+    arr_start = arr_sub.copy()
+
+##
 clu_ch = clusters['channels'][cluster_id]
-spike_samples = spikes['samples'][spikes_idx]
-v_des = viewephys(destriped, fs=sr_ap.fs)
-v_des.ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - first_sample * 1e3, np.repeat(clu_ch, len(spike_samples)),
-                       label='detects_ibl', rgb=(255, 0, 0))
-
-##
-# Remove template from raw data
-ch_cluster = cind[spikes_idx]
-spike_samples_start = spike_samples - trough_offset
-spikes_index_remove = np.array(range(0, wfs_avg.shape[1])) + np.array(spike_samples_start).reshape(-1, 1)
-
-arr_sub = arr.copy()
-for ispike in range(0, len(spike_samples_start)):
-    # Substract average wav from raw data and replace in array
-    indx = np.ix_(spikes_index_remove[ispike, :].astype('int'), ch_cluster[ispike, :].astype('int'))
-    arr_sub[indx] = arr[indx] - wfs_avg.T
-##
 viewers = {}
 viewers['raw'] = viewephys(arr.T, fs=sr_ap.fs, title='raw')
 viewers['remove'] = viewephys(arr_sub.T, fs=sr_ap.fs, title='remove')
 for label in viewers:
-    viewers[label].ctrl.add_scatter(spike_samples / sr_ap.fs * 1e3 - first_sample * 1e3, np.repeat(clu_ch, len(spike_samples)),
+    viewers[label].ctrl.add_scatter(spikes['samples_aligned'] / sr_ap.fs * 1e3, spikes['channels'],
                            label='detects_ibl', rgb=(255, 0, 0))
-
-
-##
-# Compute RMS on channels assigned to this cluster pre/post removal
-ch_unique = np.unique(np.concatenate(ch_cluster))
-rms_pre = ibldsp.utils.rms(arr[:, ch_unique], axis=0)
-rms_post = ibldsp.utils.rms(arr_sub[:, ch_unique], axis=0)
-
-plt.plot(rms_pre, 'b')
-plt.plot(rms_post, 'r')
