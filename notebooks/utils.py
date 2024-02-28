@@ -73,7 +73,7 @@ def peak_detection_sweep(residuals, thresholds, noise_levels=None, peak_sign="bo
     Returns
     -------
     peak_counts: dict
-        The number of detected peaks for each threshold
+        The number of detected peaks for each threshold normalized by the duration and number of channels
     peak_list: dict
         The list of detected peaks for each threshold
     """
@@ -102,7 +102,7 @@ def peak_detection_sweep(residuals, thresholds, noise_levels=None, peak_sign="bo
     peak_counts = dict()
     peaks = dict()
     for th, out in zip(thresholds, outs):
-        peak_counts[th] = len(out)
+        peak_counts[th] = len(out) / residuals.get_num_channels() / residuals.get_total_duration()
         peaks[th] = out
 
     return peak_counts, peaks
