@@ -90,11 +90,12 @@ PATH_SPIKE_INTERFACE = Path("/datadisk/Data/neuropixel/spike_sorting/benchmarks/
 PATH_SPIKE_INTERFACE.mkdir(exist_ok=True, parents=True)
 
 for pid in benchmark_pids:
-    print(pid)
     if PATH_SPIKE_INTERFACE.joinpath(f"{pid}_original.npy").exists():
         continue
-    recording = CompressedBinaryIblExtractor(cbin_file=PATH_CBIN.joinpath(f"{pid}.ap.cbin"))
-    sorting = read_alf_sorting(PATH_CBIN.joinpath(pid, '1.5.0', 'alf'), sampling_frequency=recording.sampling_frequency)
+    cbin_file = PATH_CBIN.joinpath(f"{pid}.ap.cbin")
+    recording = CompressedBinaryIblExtractor(cbin_file=cbin_file)
+    sorting = read_alf_sorting(
+        PATH_CBIN.joinpath(pid, '1.5.0', 'alf'), sampling_frequency=recording.sampling_frequency)
     print(sorting)
 
     print(f'{pid} pre-processing')
@@ -124,8 +125,8 @@ for pid in benchmark_pids:
     print('compute residuals')
     residual, convolved = compute_residuals(we, with_scaling=False, sparsity=sparsity)
 
-    start_frame = int(200 * 30_000)
-    end_frame = int(start_frame + (.1 * 30_000))
+    start_frame = int(200 * recording.sampling_frequency)
+    end_frame = int(start_frame + (.1 * recording.sampling_frequency))
 
     vclean = recording_clean.get_traces(start_frame=start_frame, end_frame=end_frame).T
     vres = residual.get_traces(start_frame=start_frame, end_frame=end_frame).T

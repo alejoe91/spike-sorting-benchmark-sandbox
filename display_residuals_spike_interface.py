@@ -26,7 +26,8 @@ benchmark_pids = ['1a276285-8b0e-4cc9-9f0a-a3a002978724',
 
 PATH_CBIN = Path("/datadisk/Data/neuropixel/spike_sorting/benchmarks")
 PATH_SPIKE_INTERFACE = Path("/datadisk/Data/neuropixel/spike_sorting/benchmarks/spikeinterface")
-PATH_SPIKE_INTERFACE.mkdir(exist_ok=True, parents=True)
+path_pictures = PATH_SPIKE_INTERFACE / "pictures"
+path_pictures.mkdir(exist_ok=True, parents=True)
 
 for pid in benchmark_pids:
     print(pid)
@@ -50,7 +51,5 @@ for pid in benchmark_pids:
             eqc.viewBox_seismic.setXRange(25, 75)
             eqc.ctrl.set_gain(138)
             eqc.resize(1800, 900)
-            # eqc.save_current_trace(str(OUT_IMGS_PATH / f"{label}_{pid}.png"))
+            eqc.grab().save(str(path_pictures.joinpath(f"data_{pid}_{label}.png")))
 
-
-    break
