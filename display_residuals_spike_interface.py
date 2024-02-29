@@ -31,25 +31,46 @@ path_pictures.mkdir(exist_ok=True, parents=True)
 
 for pid in benchmark_pids:
     print(pid)
+    if pid != '5d570bf6-a4c6-4bf1-a14b-2c878c84ef0e':
+        continue
     if PATH_SPIKE_INTERFACE.joinpath(f"{pid}_original.npy").exists():
+
+
 
         original = np.load(PATH_SPIKE_INTERFACE / f"{pid}_original.npy")
         residual = np.load(PATH_SPIKE_INTERFACE / f"{pid}_residual.npy")
         spikes_model = np.load(PATH_SPIKE_INTERFACE / f"{pid}_spikes_model.npy")
 
-        sl = SpikeSortingLoader(pid=pid, one=one)
-        sr = sl.raw_electrophysiology('ap')
+
+        from spikeinterface.extractors.cbin_ibl import CompressedBinaryIblExtractor
+        from spikeinterface.extractors import read_alf_sorting
+
+
+        cbin_file = PATH_CBIN.joinpath(f"{pid}.ap.cbin")
+        recording = CompressedBinaryIblExtractor(cbin_file=cbin_file)
+        path_sorting = PATH_CBIN.joinpath(pid, '1.5.0', 'alf')
+
+        sorting = read_alf_sorting(path_sorting, sampling_frequency=recording.sampling_frequency)
+        spike_samples = sorting.to_spike_vector()['sample_index']
+        start_frame = int(200 * recording.sampling_frequency)
+        end_frame = int(start_frame + (.1 * recording.sampling_frequency))
+        sel_spikes = np.logical_and(spike_samples >= start_frame, spike_samples <= end_frame)
+        spike_channels = sorting.alf_clusters['channels'][sorting.to_spike_vector()['unit_index'][sel_spikes]]
+        spike_samples = spike_samples[sel_spikes] - start_frame
+
 
         eqcs = {}
-        kwargs = {'br': regions, 'channels': sl.load_channels(), 'fs': sr.fs}
+        sl = SpikeSortingLoader(pid=pid, one=one)  # this is to get the channel geometry
+        kwargs = {'br': regions, 'channels': sl.load_channels(), 'fs': recording.sampling_frequency}
         eqcs['original'] = viewephys(original, title='original', **kwargs)
         eqcs['residual'] = viewephys(residual, title='residual', **kwargs)
         eqcs['spikes_model'] = viewephys(spikes_model, title='signal model', **kwargs)
 
         for label, eqc in eqcs.items():
-            eqc.viewBox_seismic.setYRange(0, sr.shape[0])
+            eqc.viewBox_seismic.setYRange(0, recording.get_num_channels())
             eqc.viewBox_seismic.setXRange(25, 75)
             eqc.ctrl.set_gain(138)
+            eqc.ctrl.add_scatter(spike_samples / recording.sampling_frequency * 1e3, spike_channels, rgb=(255, 0, 0), label='spikes')
             eqc.resize(1800, 900)
             eqc.grab().save(str(path_pictures.joinpath(f"data_{pid}_{label}.png")))
 

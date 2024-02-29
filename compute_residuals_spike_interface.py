@@ -90,15 +90,15 @@ PATH_SPIKE_INTERFACE = Path("/datadisk/Data/neuropixel/spike_sorting/benchmarks/
 PATH_SPIKE_INTERFACE.mkdir(exist_ok=True, parents=True)
 
 for pid in benchmark_pids:
+    if pid != '5d570bf6-a4c6-4bf1-a14b-2c878c84ef0e':
+        continue
     if PATH_SPIKE_INTERFACE.joinpath(f"{pid}_original.npy").exists():
         continue
     cbin_file = PATH_CBIN.joinpath(f"{pid}.ap.cbin")
     recording = CompressedBinaryIblExtractor(cbin_file=cbin_file)
     sorting = read_alf_sorting(
         PATH_CBIN.joinpath(pid, '1.5.0', 'alf'), sampling_frequency=recording.sampling_frequency)
-    print(sorting)
-
-    print(f'{pid} pre-processing')
+    print(f'{pid} pre-processing, fs={recording.sampling_frequency}')
     file_preproc = PATH_SPIKE_INTERFACE / f"{pid}_preprocessed.json"
     if file_preproc.exists():
         recording_clean = si.load_extractor(file_preproc)
@@ -134,5 +134,4 @@ for pid in benchmark_pids:
     np.save(PATH_SPIKE_INTERFACE / f"{pid}_original.npy", vclean)
     np.save(PATH_SPIKE_INTERFACE / f"{pid}_residual.npy", vres)
     np.save(PATH_SPIKE_INTERFACE / f"{pid}_spikes_model.npy", vconvolved)
-
-
+    break
